@@ -72,3 +72,8 @@ packages/
 # visual studio database projects
 *.dbmdl
 
+/KinectSDK/1_Basics/glut/.vs/
+/KinectSDK/2_Depth/.vs/
+/KinectSDK/3_PointCloud/.vs/
+/KinectSDK/4_SkeletalTracking/.vs/
+/KinectSDK/libs/
