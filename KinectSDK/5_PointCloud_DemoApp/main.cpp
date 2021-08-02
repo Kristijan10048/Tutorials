@@ -47,6 +47,9 @@ float g_fLx = 0.0f, g_fLz = -1.0f;
 // XZ position of the camera
 float g_fX = 0.0f, g_fZ = 5.0f;
 
+//glut view params
+GlViewData g_viewParam{ .0, .0, .0, .0, .0, .0, .0, .0, .0, };
+
 bool initKinect() {
     // Get a working kinect sensor
     int numSensors;
@@ -243,8 +246,8 @@ void OnMouseMoveCb(int x, int y)
 		deltaAngle = (x - xOrigin) * 0.001f;
 
 		// update camera's direction
-		lx = sin(g_fAngle + deltaAngle);
-		lz = -cos(g_fAngle + deltaAngle);
+		g_fLx = sin(g_fAngle + deltaAngle);
+		g_fLz = -cos(g_fAngle + deltaAngle);
 	}
 }
 
