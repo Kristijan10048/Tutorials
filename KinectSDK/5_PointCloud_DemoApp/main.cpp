@@ -204,13 +204,23 @@ void rotateCamera()
 	static double angle = 0.;
 	static double radius = 2.;
 
-	double x = radius * sin(g_fAngle);
-	double z = radius * (1 - cos(g_fAngle)) - radius / 2;
+	g_viewParam.EyeX = radius * sin(g_fAngle);
+	g_viewParam.EyeZ = radius * (1 - cos(g_fAngle)) - radius / 2;
+
+	g_viewParam.CenterZ = radius / 2;
+	g_viewParam.UpY = 1;
+
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
-	gluLookAt(x, 0, z,
-			  0, 0, radius / 2,
-			  0, 1, 0);
+	gluLookAt(g_viewParam.EyeX, 
+			  g_viewParam.EyeY, 
+			  g_viewParam.EyeZ,
+			  g_viewParam.CenterX, 
+			  g_viewParam.CenterY, 
+			  g_viewParam.CenterZ,
+			  g_viewParam.UpX, 
+			  g_viewParam.UpY, 
+			  g_viewParam.UpZ);
 	//angle += 0.01;
 }
 
