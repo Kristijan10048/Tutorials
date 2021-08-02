@@ -11,6 +11,14 @@
 #include <NuiImageCamera.h>
 #include <NuiSensor.h>
 
+//Added logging for conlse 
+#include "loguru.hpp"
+
+#include <fstream>
+#include <string>
+
+using namespace std;
+
 // OpenGL Variables
 long depthToRgbMap[width*height*2];
 
@@ -22,6 +30,22 @@ GLuint cboId;
 HANDLE depthStream;
 HANDLE rgbStream;
 INuiSensor* sensor;
+
+//tmp file loggin
+std::ofstream log_file("log_file.txt", std::ios_base::out | std::ios_base::app);
+
+int g_iFrmCount;
+
+float deltaAngle = 0.01f;
+int xOrigin = -1;
+// angle of rotation for the camera direction
+float g_fAngle = 0.0f;
+
+// actual vector representing the camera's direction
+float g_fLx = 0.0f, g_fLz = -1.0f;
+
+// XZ position of the camera
+float g_fX = 0.0f, g_fZ = 5.0f;
 
 bool initKinect() {
     // Get a working kinect sensor
@@ -35,13 +59,13 @@ bool initKinect() {
     // Initialize sensor
     sensor->NuiInitialize(NUI_INITIALIZE_FLAG_USES_DEPTH | NUI_INITIALIZE_FLAG_USES_COLOR);
     sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_DEPTH, // Depth camera or rgb camera?
-        NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
+	    NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
         0,        // Image stream flags, e.g. near mode
         2,        // Number of frames to buffer
         NULL,     // Event handle
         &depthStream);
 	sensor->NuiImageStreamOpen(NUI_IMAGE_TYPE_COLOR, // Depth camera or rgb camera?
-        NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
+		NUI_IMAGE_RESOLUTION_640x480,                // Image resolution
         0,      // Image stream flags, e.g. near mode
         2,      // Number of frames to buffer
         NULL,   // Event handle
@@ -51,13 +75,21 @@ bool initKinect() {
 
 void getDepthData(GLubyte* dest)
 {
+	float x;
+	float y;
+	float z;
+
 	float* fdest = ( float* ) dest;
 	long* depth2rgb = ( long* ) depthToRgbMap;
 	NUI_IMAGE_FRAME imageFrame;
 	NUI_LOCKED_RECT LockedRect;
+	
 
 	if( sensor->NuiImageStreamGetNextFrame(depthStream, 0, &imageFrame) < 0 ) 
 		return;
+
+	std::ofstream log_frame(".\\log_frames\\log_frame" + to_string(g_iFrmCount) + ".txt", std::ios_base::out | std::ios_base::app);
+
 	INuiFrameTexture* texture = imageFrame.pFrameTexture;
 	texture->LockRect(0, &LockedRect, NULL, 0);
 	if( LockedRect.Pitch != 0 )
@@ -70,13 +102,21 @@ void getDepthData(GLubyte* dest)
 				// Get depth of pixel in millimeters
 				USHORT depth = NuiDepthPixelToDepth(*curr++);
 				// Store coordinates of the point corresponding to this pixel
-				Vector4 pos = NuiTransformDepthImageToSkeleton(i, j, depth << 3, NUI_IMAGE_RESOLUTION_640x480);
-				*fdest++ = pos.x / pos.w;
-				*fdest++ = pos.y / pos.w;
-				*fdest++ = pos.z / pos.w;
+				Vector4 pos = NuiTransformDepthImageToSkeleton(i, j, depth << 3, NUI_IMAGE_RESOLUTION_1280x960);
+				x = pos.x / pos.w;
+				y = pos.y / pos.w;
+				z = pos.z / pos.w;
+
+				*fdest++ = x;
+				*fdest++ = y;
+				*fdest++ = z;
+
+				//Log(pos.x, pos.y, pos.z);
+				//log_frame << to_string(x) << " " << to_string(y) << " " << to_string(z) <<  "\n";
+
 				// Store the index into the color array corresponding to this pixel
 				NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution(
-					NUI_IMAGE_RESOLUTION_640x480, NUI_IMAGE_RESOLUTION_640x480, NULL,
+					NUI_IMAGE_RESOLUTION_1280x960, NUI_IMAGE_RESOLUTION_1280x960, NULL,
 					i, j, depth << 3, depth2rgb, depth2rgb + 1);
 				depth2rgb += 2;
 			}
@@ -84,6 +124,9 @@ void getDepthData(GLubyte* dest)
 	}
 	texture->UnlockRect(0);
 	sensor->NuiImageStreamReleaseFrame(depthStream, &imageFrame);
+	
+	g_iFrmCount++;
+	log_frame.close();
 }
 
 void getRgbData(GLubyte* dest)
@@ -153,17 +196,19 @@ void getKinectData()
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 }
 
-void rotateCamera ()
+void rotateCamera()
 {
 	static double angle = 0.;
-	static double radius = 3.;
+	static double radius = 2.;
 
-	double x = radius * sin (angle);
-	double z = radius * (1 - cos (angle)) - radius / 2;
-	glMatrixMode (GL_MODELVIEW);
-	glLoadIdentity ();
-	gluLookAt (x, 0, z, 0, 0, radius / 2, 0, 1, 0);
-	angle += 0.01;
+	double x = radius * sin(g_fAngle);
+	double z = radius * (1 - cos(g_fAngle)) - radius / 2;
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+	gluLookAt(x, 0, z,
+			  0, 0, radius / 2,
+			  0, 1, 0);
+	//angle += 0.01;
 }
 
 void drawKinectData()
@@ -188,14 +233,63 @@ void drawKinectData()
 	glDisableClientState(GL_COLOR_ARRAY);
 }
 
+void OnMouseMoveCb(int x, int y)
+{
+	// this will only be true when the left button is down
+	if( xOrigin >= 0 )
+	{
+
+		// update deltaAngle
+		deltaAngle = (x - xOrigin) * 0.001f;
+
+		// update camera's direction
+		lx = sin(g_fAngle + deltaAngle);
+		lz = -cos(g_fAngle + deltaAngle);
+	}
+}
+
+void OnMouseButtonCb(int button, int state, int x, int y)
+{
+
+	// only start motion if the left button is pressed
+	if( button == GLUT_LEFT_BUTTON )
+	{
+
+		// when the button is released
+		if( state == GLUT_UP )
+		{
+			g_fAngle += deltaAngle;
+			xOrigin = -1;
+		}
+		else
+		{// state = GLUT_DOWN
+			xOrigin = x;
+		}
+	}
+}
+
+void Log(const float x, const float y, const float z)
+{
+	log_file << to_string(x) << " " << to_string(y) << " " << to_string(z) << "\n";
+}
+
+
+void Log(const std::string& text)
+{	
+	log_file << text;// << std::end;
+}
+
 int main(int argc, char* argv[])
 {
+	Log("Staring main app 1");
+
 	if( !init(argc, argv) )
 		return 1;
 
 	if( !initKinect() )
 		return 1;
-
+	
+	g_iFrmCount = 0;
 	// OpenGL setup
 	glClearColor(0, 0, 0, 0);
 	glClearDepth(1.0f);
@@ -220,5 +314,6 @@ int main(int argc, char* argv[])
 
 	// Main loop
 	execute();
+	log_file.close();
 	return 0;
 }
