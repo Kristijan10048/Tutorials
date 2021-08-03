@@ -20,10 +20,16 @@ bool init(int argc, char* argv[])
 	glutCreateWindow("Kinect SDK Tutorial");
 	glutDisplayFunc(draw);
 	glutIdleFunc(draw);
-	//glutPassiveMotionFunc(OnMouseMove);
-	// here are the two new functions
+	
+	//mouse events
 	glutMouseFunc(OnMouseButtonCb);
 	glutMotionFunc(OnMouseMoveCb);
+
+	//keboard events
+	glutKeyboardFunc(OnProcessNormalKeysCb);
+	glutSpecialFunc(OnPressKeyCb);
+	glutSpecialUpFunc(OnReleaseKeyCb);
+
 
 	glewInit();
 	return true;

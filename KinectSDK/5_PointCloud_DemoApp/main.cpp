@@ -16,6 +16,7 @@
 
 #include <fstream>
 #include <string>
+#include <iostream>
 
 using namespace std;
 
@@ -38,6 +39,7 @@ int g_iFrmCount;
 
 float deltaAngle = 0.01f;
 int xOrigin = -1;
+
 // angle of rotation for the camera direction
 float g_fAngle = 0.0f;
 
@@ -48,7 +50,9 @@ float g_fLx = 0.0f, g_fLz = -1.0f;
 float g_fX = 0.0f, g_fZ = 5.0f;
 
 //glut view params
-GlViewData g_viewParam{ .0, .0, .0, .0, .0, .0, .0, .0, .0, };
+GlViewData g_viewParam{ .0, .0, .0, .0, .0, .5, .0, 1.0, .0, };
+
+static float g_fRadius = .5;
 
 bool initKinect() {
     // Get a working kinect sensor
@@ -105,7 +109,7 @@ void getDepthData(GLubyte* dest)
 				// Get depth of pixel in millimeters
 				USHORT depth = NuiDepthPixelToDepth(*curr++);
 				// Store coordinates of the point corresponding to this pixel
-				Vector4 pos = NuiTransformDepthImageToSkeleton(i, j, depth << 3, NUI_IMAGE_RESOLUTION_1280x960);
+				Vector4 pos = NuiTransformDepthImageToSkeleton(i, j, depth << 3, NUI_IMAGE_RESOLUTION_640x480);
 				x = pos.x / pos.w;
 				y = pos.y / pos.w;
 				z = pos.z / pos.w;
@@ -119,7 +123,7 @@ void getDepthData(GLubyte* dest)
 
 				// Store the index into the color array corresponding to this pixel
 				NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution(
-					NUI_IMAGE_RESOLUTION_1280x960, NUI_IMAGE_RESOLUTION_1280x960, NULL,
+					NUI_IMAGE_RESOLUTION_640x480, NUI_IMAGE_RESOLUTION_640x480, NULL,
 					i, j, depth << 3, depth2rgb, depth2rgb + 1);
 				depth2rgb += 2;
 			}
@@ -199,17 +203,28 @@ void getKinectData()
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 }
 
-void rotateCamera()
+void computePos(float deltaMove)
+{
+
+	//x += deltaMove * g_fX * 0.1f;
+	//z += deltaMove * g_fZ * 0.1f;
+}
+
+
+void CalculateCameraRotation()
 {
 	static double angle = 0.;
-	static double radius = 2.;
+	
+	g_viewParam.EyeX = g_fRadius * sin(g_fAngle);
+	g_viewParam.EyeZ = g_fRadius * (1 - cos(g_fAngle)) - g_fRadius /2;
+	//g_viewParam.CenterZ = radius / 2;	
+}
 
-	g_viewParam.EyeX = radius * sin(g_fAngle);
-	g_viewParam.EyeZ = radius * (1 - cos(g_fAngle)) - radius / 2;
+void rotateCamera()
+{
+	CalculateCameraRotation();
 
-	g_viewParam.CenterZ = radius / 2;
-	g_viewParam.UpY = 1;
-
+	//https://www.lighthouse3d.com/tutorials/glut-tutorial/the-code-so-far-ii/
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 	gluLookAt(g_viewParam.EyeX, 
@@ -221,7 +236,6 @@ void rotateCamera()
 			  g_viewParam.UpX, 
 			  g_viewParam.UpY, 
 			  g_viewParam.UpZ);
-	//angle += 0.01;
 }
 
 void drawKinectData()
@@ -278,6 +292,108 @@ void OnMouseButtonCb(int button, int state, int x, int y)
 		{// state = GLUT_DOWN
 			xOrigin = x;
 		}
+
+		CalculateCameraRotation();
+	}
+}
+
+void OnProcessNormalKeysCb(unsigned char key, int xx, int yy)
+{
+	if( key == 27 )
+		exit(0);
+
+	//tilt the camera along Y axie
+	else if( (char(key) == 'a') || (char(key) == 'A') )
+	{
+		g_viewParam.CenterX += 0.05f;
+	}
+	else if( (char(key) == 'd') || (char(key) == 'D') )
+	{
+		g_viewParam.CenterX -= 0.05f;
+	}
+	else if( (char(key) == 'w') || (char(key) == 'W') )
+	{
+		g_viewParam.CenterY -= 0.05f;
+	}
+
+	//tilt the camera along Y axie
+	else if( (char(key) == 's') || (char(key) == 'S') )
+	{
+		g_viewParam.CenterY += 0.05f;
+	}
+	else if( (char(key) == 'w') || (char(key) == 'W') )
+	{
+		g_viewParam.CenterY -= 0.05f;
+	}
+
+	//??
+	else if( (char(key) == 'q') || (char(key) == 'Q') )
+	{
+		g_viewParam.CenterZ += 0.01f;
+	}
+	else if( (char(key) == 'e') || (char(key) == 'E') )
+	{
+		g_viewParam.CenterZ -= 0.01f;
+	}
+
+	//
+	else if( (char(key) == '/')  )
+	{
+		g_viewParam.EyeY += 0.1f;
+	}
+	else if( (char(key) == '*')  )
+	{
+		g_viewParam.EyeY -= 0.1f;
+	}
+
+	//
+	else if( (char(key) == '=') )
+	{
+		g_fRadius -= 0.1f;
+	}
+	else if( (char(key) == '-') )
+	{
+		g_fRadius += 0.1f;
+	}
+
+	//reset view
+	else if( (char(key) == 'n') || (char(key) == 'N') )
+	{
+		g_viewParam.EyeX = 0;
+		g_viewParam.EyeY = 0;
+		g_viewParam.EyeZ = 0;
+		g_viewParam.CenterX = 0;
+		g_viewParam.CenterY = 0;
+		g_viewParam.CenterZ = .5;
+
+		g_fAngle = 0;
+	}
+	cout << g_viewParam.toString() <<endl;
+}
+
+void OnPressKeyCb(int key, int xx, int yy)
+{
+
+	switch( key )
+	{
+	case GLUT_KEY_UP:
+		//deltaMove = 0.5f; 
+		break;
+	case GLUT_KEY_DOWN:
+		//deltaMove = -0.5f; 
+		break;
+	}
+}
+
+void OnReleaseKeyCb(int key, int x, int y)
+{
+
+	switch( key )
+	{
+	case GLUT_KEY_UP:
+	case GLUT_KEY_DOWN:
+		//deltaMove = 0; 
+		break;
 	}
 }
 
@@ -286,16 +402,13 @@ void Log(const float x, const float y, const float z)
 	log_file << to_string(x) << " " << to_string(y) << " " << to_string(z) << "\n";
 }
 
-
 void Log(const std::string& text)
 {	
 	log_file << text;// << std::end;
 }
 
 int main(int argc, char* argv[])
-{
-	Log("Staring main app 1");
-
+{	
 	if( !init(argc, argv) )
 		return 1;
 
