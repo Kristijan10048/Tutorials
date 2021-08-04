@@ -77,3 +77,5 @@ packages/
 /KinectSDK/3_PointCloud/.vs/
 /KinectSDK/4_SkeletalTracking/.vs/
 /KinectSDK/libs/
+/KinectSDK/5_PointCloud_DemoApp/log_file.txt
+/KinectSDK/5_PointCloud_DemoApp/.vs/
