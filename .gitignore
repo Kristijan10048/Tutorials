@@ -79,3 +79,5 @@ packages/
 /KinectSDK/libs/
 /KinectSDK/5_PointCloud_DemoApp/log_file.txt
 /KinectSDK/5_PointCloud_DemoApp/.vs/
+/KinectSDK/5_PointCloud_DemoApp/log_frames/
+/KinectSDK/3_PointCloud/log_frames/
