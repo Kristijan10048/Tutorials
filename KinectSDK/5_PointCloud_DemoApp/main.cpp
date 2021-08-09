@@ -17,7 +17,11 @@
 #include <fstream>
 #include <string>
 #include <iostream>
+//async 
+#include <future>
 
+//check form memory leaks
+#include <crtdbg.h>
 using namespace std;
 
 // OpenGL Variables
@@ -54,6 +58,9 @@ GlViewData g_viewParam{ .0, .0, .0, .0, .0, .5, .0, 1.0, .0, };
 
 static float g_fRadius = .5;
 
+
+bool g_bStoreDeptImg = false;
+
 bool initKinect() {
     // Get a working kinect sensor
     int numSensors;
@@ -80,7 +87,32 @@ bool initKinect() {
     return sensor;
 }
 
-void getDepthData(GLubyte* dest)
+
+void WriteFrameToFile(Vector4* outDepthImgBuff)
+{
+	if( outDepthImgBuff == nullptr )
+		return;
+	
+	Vector4* tmpBuffPtr = outDepthImgBuff;
+
+	std::ofstream log_frame(".\\log_frames\\log_frame" + to_string(g_iFrmCount) + ".txt", std::ios_base::out | std::ios_base::app);
+	
+	for( int j = 0; j < height; ++j )
+	{
+		for( int i = 0; i < width; ++i )
+		{			
+			log_frame << to_string(outDepthImgBuff->x) << " " << to_string(outDepthImgBuff->y) << " " << to_string(outDepthImgBuff->z) <<  " " << to_string(outDepthImgBuff->w) << "\n";
+			outDepthImgBuff++;
+		}
+	}
+
+	g_iFrmCount++;
+	//clean up
+	log_frame.close();
+	delete[] tmpBuffPtr;
+}
+
+void getDepthData(GLubyte* dest, Vector4 * delpthImg = nullptr )
 {
 	float x;
 	float y;
@@ -95,7 +127,7 @@ void getDepthData(GLubyte* dest)
 	if( sensor->NuiImageStreamGetNextFrame(depthStream, 0, &imageFrame) < 0 ) 
 		return;
 
-	std::ofstream log_frame(".\\log_frames\\log_frame" + to_string(g_iFrmCount) + ".txt", std::ios_base::out | std::ios_base::app);
+	
 
 	INuiFrameTexture* texture = imageFrame.pFrameTexture;
 	texture->LockRect(0, &LockedRect, NULL, 0);
@@ -118,8 +150,9 @@ void getDepthData(GLubyte* dest)
 				*fdest++ = y;
 				*fdest++ = z;
 
-				//Log(pos.x, pos.y, pos.z);
-				//log_frame << to_string(x) << " " << to_string(y) << " " << to_string(z) <<  "\n";
+				//try to store data in the buffer
+				if( delpthImg != nullptr )				
+					*delpthImg++ = pos;		
 
 				// Store the index into the color array corresponding to this pixel
 				NuiImageGetColorPixelCoordinatesFromDepthPixelAtResolution(
@@ -131,9 +164,8 @@ void getDepthData(GLubyte* dest)
 	}
 	texture->UnlockRect(0);
 	sensor->NuiImageStreamReleaseFrame(depthStream, &imageFrame);
-	
-	g_iFrmCount++;
-	log_frame.close();
+
+	cout << "-" << endl;
 }
 
 void getRgbData(GLubyte* dest)
@@ -170,7 +202,6 @@ void getRgbData(GLubyte* dest)
 					for( int n = 0; n < 3; ++n ) 
 						*(fdest++) = curr[2 - n] / 255.0f;
 				}
-
 			}
 		}
 	}
@@ -188,7 +219,27 @@ void getKinectData()
 
 	if( ptr )
 	{
-		getDepthData(ptr);
+		if( g_bStoreDeptImg )
+		{
+
+			g_bStoreDeptImg = false;
+
+			//alocate mem
+			Vector4* outDepthImgBuff = new Vector4[height * width];
+
+			getDepthData(ptr, outDepthImgBuff);
+
+			//std::future<std::string> resultFromDB =
+			std::future<void> res = std::async(std::launch::async, WriteFrameToFile, outDepthImgBuff);
+			//WriteFrameToFile(outDepthImgBuff);
+
+			//res.get(); //await
+				//free mem
+			//delete[] outDepthImgBuff;
+
+		}
+		else
+			getDepthData(ptr);
 	}
 	glUnmapBuffer(GL_ARRAY_BUFFER);
 
@@ -209,7 +260,6 @@ void computePos(float deltaMove)
 	//x += deltaMove * g_fX * 0.1f;
 	//z += deltaMove * g_fZ * 0.1f;
 }
-
 
 void CalculateCameraRotation()
 {
@@ -335,8 +385,7 @@ void OnProcessNormalKeysCb(unsigned char key, int xx, int yy)
 	{
 		g_viewParam.CenterZ -= 0.01f;
 	}
-
-	//
+	
 	else if( (char(key) == '/')  )
 	{
 		g_viewParam.EyeY += 0.1f;
@@ -346,7 +395,7 @@ void OnProcessNormalKeysCb(unsigned char key, int xx, int yy)
 		g_viewParam.EyeY -= 0.1f;
 	}
 
-	//
+	//zoom in/out along y 
 	else if( (char(key) == '=') )
 	{
 		g_fRadius -= 0.1f;
@@ -354,6 +403,11 @@ void OnProcessNormalKeysCb(unsigned char key, int xx, int yy)
 	else if( (char(key) == '-') )
 	{
 		g_fRadius += 0.1f;
+	}
+
+	else if( (char(key) == 'p') || (char(key) == 'P') )
+	{
+		g_bStoreDeptImg = true;
 	}
 
 	//reset view
@@ -441,5 +495,7 @@ int main(int argc, char* argv[])
 	// Main loop
 	execute();
 	log_file.close();
+
+	_CrtDumpMemoryLeaks();
 	return 0;
 }
