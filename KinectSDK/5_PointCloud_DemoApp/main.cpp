@@ -95,6 +95,7 @@ void WriteFrameToFile(Vector4* outDepthImgBuff)
 	
 	Vector4* tmpBuffPtr = outDepthImgBuff;
 
+	LOG_F(INFO, "Write to a file");
 	std::ofstream log_frame(".\\log_frames\\log_frame" + to_string(g_iFrmCount) + ".txt", std::ios_base::out | std::ios_base::app);
 	
 	for( int j = 0; j < height; ++j )
@@ -165,7 +166,6 @@ void getDepthData(GLubyte* dest, Vector4 * delpthImg = nullptr )
 	texture->UnlockRect(0);
 	sensor->NuiImageStreamReleaseFrame(depthStream, &imageFrame);
 
-	cout << "-" << endl;
 }
 
 void getRgbData(GLubyte* dest)
@@ -462,7 +462,10 @@ void Log(const std::string& text)
 }
 
 int main(int argc, char* argv[])
-{	
+{
+
+	loguru::init(argc, argv, loguru::Options());
+
 	if( !init(argc, argv) )
 		return 1;
 
